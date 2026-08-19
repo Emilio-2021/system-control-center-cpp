@@ -120,6 +120,8 @@ tests/                    Unit and HTTP integration tests
 third_party/              Bundled SQLite, Inja, JSON, and bcrypt sources
 ```
 
+Third-party licensing and attribution details are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Build and run
 
 From PowerShell:
