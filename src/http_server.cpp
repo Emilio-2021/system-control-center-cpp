@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <ctime>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -32,6 +33,7 @@ namespace {
 
 std::mutex sessions_mutex;
 std::unordered_map<std::string, std::string> sessions;
+std::mutex log_mutex;
 
 #ifdef _WIN32
 using Socket = SOCKET;
@@ -55,15 +57,70 @@ std::string content_type(const std::filesystem::path& path) {
 
 std::string response(std::string_view status, std::string_view type,
                      std::string_view body, std::string_view extra_headers = {}) {
+    std::string rendered_body(body);
+    const std::string plain_brand = R"(<a class="navbar-brand" href="/dashboard">System Control Center</a>)";
+    const std::string arrow_brand = R"(<a class="navbar-brand" href="/dashboard">← System Control Center</a>)";
+    std::string section_label = "System Control Center";
+    if (rendered_body.find("Product Master Catalog") != std::string::npos) section_label = "Stock Room Registry";
+    else if (rendered_body.find("Business Entities Registry") != std::string::npos) section_label = "Enterprise Business Entities Matrix";
+    else if (rendered_body.find("Users and Roles") != std::string::npos) section_label = "User Records Management Grid";
+    else if (rendered_body.find("Orders &amp; Invoiced Line Items") != std::string::npos) section_label = "Transaction Tracking Room";
+    else if (rendered_body.find("Invoice Checkout Wizard") != std::string::npos || rendered_body.find("Create New Sales Order Invoice") != std::string::npos) section_label = "Sales Register Desk";
+    else if (rendered_body.find("Order #") != std::string::npos) section_label = "Order Details";
+    const std::string dashboard_brand = "<div class=\"d-flex align-items-center\"><a class=\"navbar-brand\" href=\"/dashboard\">← System Dashboard</a><span class=\"navbar-text text-white-50 ms-3\">" + section_label + "</span></div>";
+    std::size_t brand_position = 0;
+    while ((brand_position = rendered_body.find(plain_brand, brand_position)) != std::string::npos) {
+        rendered_body.replace(brand_position, plain_brand.size(), dashboard_brand);
+        brand_position += dashboard_brand.size();
+    }
+    brand_position = 0;
+    while ((brand_position = rendered_body.find(arrow_brand, brand_position)) != std::string::npos) {
+        rendered_body.replace(brand_position, arrow_brand.size(), dashboard_brand);
+        brand_position += dashboard_brand.size();
+    }
     std::ostringstream output;
     output << "HTTP/1.1 " << status << "\r\n"
            << "Content-Type: " << type << "\r\n"
            << extra_headers
-           << "Content-Length: " << body.size() << "\r\n"
+           << "Content-Length: " << rendered_body.size() << "\r\n"
            << "Connection: close\r\n"
            << "\r\n";
-    output.write(body.data(), static_cast<std::streamsize>(body.size()));
+    output.write(rendered_body.data(), static_cast<std::streamsize>(rendered_body.size()));
     return output.str();
+}
+
+void write_log(const std::filesystem::path& root, std::string_view level,
+               std::string_view message) {
+    std::lock_guard<std::mutex> lock(log_mutex);
+    std::error_code error;
+    const auto log_directory = root / "logs";
+    std::filesystem::create_directories(log_directory, error);
+    if (error) return;
+
+    const auto log_file = log_directory / "log.txt";
+    constexpr std::uintmax_t maximum_log_size = 5 * 1024 * 1024;
+    if (std::filesystem::exists(log_file, error) &&
+        std::filesystem::file_size(log_file, error) >= maximum_log_size) {
+        for (int backup = 3; backup >= 1; --backup) {
+            const auto current = log_directory / ("log.txt." + std::to_string(backup));
+            const auto next = log_directory / ("log.txt." + std::to_string(backup + 1));
+            if (backup == 3) std::filesystem::remove(current, error);
+            else if (std::filesystem::exists(current, error)) std::filesystem::rename(current, next, error);
+        }
+        std::filesystem::rename(log_file, log_directory / "log.txt.1", error);
+    }
+
+    std::ofstream output(log_file, std::ios::app);
+    if (!output) return;
+    const auto now = std::time(nullptr);
+    std::tm local_time{};
+#ifdef _WIN32
+    localtime_s(&local_time, &now);
+#else
+    localtime_r(&now, &local_time);
+#endif
+    output << std::put_time(&local_time, "%Y-%m-%d %H:%M:%S")
+           << " | " << level << " | " << message << '\n';
 }
 
 std::string create_session(const std::string& username) {
@@ -458,10 +515,10 @@ std::string checkout_result(const std::filesystem::path& root, std::string_view 
     const auto username=session_username(request); if(username.empty())return redirect("/?error=Please%20sign%20in");
     sqlite3* db=nullptr; const auto file=(root/"data"/"system_control_center.db").string(); if(sqlite3_open_v2(file.c_str(),&db,SQLITE_OPEN_READONLY,nullptr)!=SQLITE_OK)return response("500 Internal Server Error","text/plain; charset=utf-8","Database unavailable\n");
     nlohmann::json data; data["role"]="viewer"; data["username"]=username;
-    sqlite3_stmt* role=nullptr;if(sqlite3_prepare_v2(db,"SELECT role FROM users WHERE username=?1",-1,&role,nullptr)==SQLITE_OK){sqlite3_bind_text(role,1,username.c_str(),-1,SQLITE_TRANSIENT);if(sqlite3_step(role)==SQLITE_ROW)data["role"]=reinterpret_cast<const char*>(sqlite3_column_text(role,0));}sqlite3_finalize(role);
+    sqlite3_stmt* role=nullptr;if(sqlite3_prepare_v2(db,"SELECT role FROM users WHERE username=?1",-1,&role,nullptr)==SQLITE_OK){sqlite3_bind_text(role,1,username.c_str(),-1,SQLITE_TRANSIENT);if(sqlite3_step(role)==SQLITE_ROW)data["role"]=reinterpret_cast<const char*>(sqlite3_column_text(role,0));}sqlite3_finalize(role);data["read_only"] = data["role"] == "viewer";
     sqlite3_stmt* s=nullptr;if(sqlite3_prepare_v2(db,"SELECT e.id,e.name,et.entity FROM entities e JOIN entity_type et ON e.entity_type=et.id ORDER BY e.name",-1,&s,nullptr)==SQLITE_OK)while(sqlite3_step(s)==SQLITE_ROW)data["customers"].push_back({{"id",sqlite3_column_int(s,0)},{"name",reinterpret_cast<const char*>(sqlite3_column_text(s,1))},{"entity_type",reinterpret_cast<const char*>(sqlite3_column_text(s,2))}});sqlite3_finalize(s);
     if(sqlite3_prepare_v2(db,"SELECT id,name,price,stock_quantity FROM products WHERE stock_quantity>0 ORDER BY name",-1,&s,nullptr)==SQLITE_OK)while(sqlite3_step(s)==SQLITE_ROW)data["products"].push_back({{"id",sqlite3_column_int(s,0)},{"name",reinterpret_cast<const char*>(sqlite3_column_text(s,1))},{"price",sqlite3_column_double(s,2)},{"stock_quantity",sqlite3_column_int(s,3)}});sqlite3_finalize(s);sqlite3_close(db);
-    try{inja::Environment env((root/"templates").string());env.set_html_autoescape(true);return response("200 OK","text/html; charset=utf-8",env.render_file((root/"templates"/"checkout.html").string(),data));}catch(...){return response("500 Internal Server Error","text/plain; charset=utf-8","Checkout template unavailable\n");}
+    try{inja::Environment env((root/"templates").string());env.set_html_autoescape(true);return response("200 OK","text/html; charset=utf-8",env.render_file((root/"templates"/"checkout.html").string(),data));}catch(const std::exception& error){std::cerr << "Checkout template rendering failed: " << error.what() << "\n";return response("500 Internal Server Error","text/plain; charset=utf-8","Checkout template unavailable\n");}
 }
 
 std::string checkout_create(const std::filesystem::path& root, std::string_view request) {
@@ -545,7 +602,55 @@ std::string checkout_create(const std::filesystem::path& root, std::string_view 
 }
 
 std::string orders_result(const std::filesystem::path& root, std::string_view request) {
-    if(session_username(request).empty())return redirect("/?error=Please%20sign%20in");sqlite3*db=nullptr;const auto file=(root/"data"/"system_control_center.db").string();if(sqlite3_open_v2(file.c_str(),&db,SQLITE_OPEN_READONLY,nullptr)!=SQLITE_OK)return response("500 Internal Server Error","text/plain; charset=utf-8","Database unavailable\n");nlohmann::json data;sqlite3_stmt*s=nullptr;const char*sql="SELECT o.id,e.name,o.status,o.created_at,COALESCE(SUM(oi.quantity*oi.unit_price),0) FROM orders o JOIN entities e ON o.entity_id=e.id LEFT JOIN order_items oi ON oi.order_id=o.id GROUP BY o.id,e.name,o.status,o.created_at ORDER BY o.created_at DESC";if(sqlite3_prepare_v2(db,sql,-1,&s,nullptr)==SQLITE_OK)while(sqlite3_step(s)==SQLITE_ROW)data["orders"].push_back({{"order_id",sqlite3_column_int(s,0)},{"customer_name",reinterpret_cast<const char*>(sqlite3_column_text(s,1))},{"status",reinterpret_cast<const char*>(sqlite3_column_text(s,2))},{"created_at",reinterpret_cast<const char*>(sqlite3_column_text(s,3))},{"order_total",sqlite3_column_double(s,4)}});sqlite3_finalize(s);sqlite3_close(db);try{inja::Environment env((root/"templates").string());env.set_html_autoescape(true);return response("200 OK","text/html; charset=utf-8",env.render_file((root/"templates"/"orders.html").string(),data));}catch(...){return response("500 Internal Server Error","text/plain; charset=utf-8","Orders template unavailable\n");}
+    if (session_username(request).empty()) return redirect("/?error=Please%20sign%20in");
+    sqlite3* db = nullptr;
+    const auto file = (root / "data" / "system_control_center.db").string();
+    if (sqlite3_open_v2(file.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+        if (db != nullptr) sqlite3_close(db);
+        return response("500 Internal Server Error", "text/plain; charset=utf-8", "Database unavailable\n");
+    }
+    nlohmann::json data;
+    sqlite3_stmt* statement = nullptr;
+    const char* order_sql = "SELECT o.id, e.name, o.status, o.created_at, "
+        "COALESCE(SUM(oi.quantity * oi.unit_price), 0) "
+        "FROM orders o JOIN entities e ON o.entity_id = e.id "
+        "LEFT JOIN order_items oi ON oi.order_id = o.id "
+        "GROUP BY o.id, e.name, o.status, o.created_at ORDER BY o.created_at DESC";
+    if (sqlite3_prepare_v2(db, order_sql, -1, &statement, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(statement) == SQLITE_ROW) {
+            data["orders"].push_back({
+                {"order_id", sqlite3_column_int(statement, 0)},
+                {"customer_name", reinterpret_cast<const char*>(sqlite3_column_text(statement, 1))},
+                {"status", reinterpret_cast<const char*>(sqlite3_column_text(statement, 2))},
+                {"created_at", reinterpret_cast<const char*>(sqlite3_column_text(statement, 3))},
+                {"order_total", sqlite3_column_double(statement, 4)}});
+        }
+    }
+    sqlite3_finalize(statement);
+    const char* item_sql = "SELECT oi.order_id, p.name, p.sku, oi.quantity, oi.unit_price, "
+        "oi.quantity * oi.unit_price FROM order_items oi JOIN products p ON p.id = oi.product_id "
+        "ORDER BY oi.order_id DESC, oi.id";
+    if (sqlite3_prepare_v2(db, item_sql, -1, &statement, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(statement) == SQLITE_ROW) {
+            data["items"].push_back({
+                {"order_id", sqlite3_column_int(statement, 0)},
+                {"product_name", reinterpret_cast<const char*>(sqlite3_column_text(statement, 1))},
+                {"sku", reinterpret_cast<const char*>(sqlite3_column_text(statement, 2))},
+                {"quantity", sqlite3_column_int(statement, 3)},
+                {"unit_price", sqlite3_column_double(statement, 4)},
+                {"row_total", sqlite3_column_double(statement, 5)}});
+        }
+    }
+    sqlite3_finalize(statement);
+    sqlite3_close(db);
+    data["has_orders"] = data.contains("orders") && !data["orders"].empty();
+    try {
+        inja::Environment env((root / "templates").string());
+        env.set_html_autoescape(true);
+        return response("200 OK", "text/html; charset=utf-8", env.render_file((root / "templates" / "orders.html").string(), data));
+    } catch (...) {
+        return response("500 Internal Server Error", "text/plain; charset=utf-8", "Orders template unavailable\n");
+    }
 }
 
 std::string order_detail_result(const std::filesystem::path& root, std::string_view request, int order_id) {
@@ -869,7 +974,11 @@ HttpServer::HttpServer(unsigned short port, std::filesystem::path web_root)
     : port_(port), web_root_(std::move(web_root)) {}
 
 std::string HttpServer::handle_request(const std::string& request) const {
-    return ::handle_request(request, web_root_);
+    const auto result = ::handle_request(request, web_root_);
+    const auto status_end = result.find("\r\n");
+    const auto status = result.substr(0, status_end);
+    write_log(web_root_, "INFO", request_method(request) + " " + request_path(request) + " " + status);
+    return result;
 }
 
 int HttpServer::run() {
@@ -911,6 +1020,7 @@ int HttpServer::run() {
     std::cout << "System Control Center C++ web server\n"
               << "Listening at http://127.0.0.1:" << port_ << "\n"
               << "Press Ctrl+C to stop.\n";
+    write_log(web_root_, "INFO", "server_started port=" + std::to_string(port_));
 
     for (;;) {
         sockaddr_in client_address{};

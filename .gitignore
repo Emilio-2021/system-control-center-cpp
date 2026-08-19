@@ -1,8 +1,34 @@
+# CMake and build output
 build/
 dist/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+Testing/
+
+# Native compiler/linker artifacts
 *.o
 *.obj
+*.a
+*.lib
+*.dll
 *.exe
+*.pdb
+*.ilk
+
+# Runtime state and local diagnostics
 *.db
 *.log
+logs/
+!logs/
+logs/*.txt
+!logs/.gitkeep
+
+# IDE and local editor settings
 .vscode/
+.vs/
+.idea/
+*.user
+*.suo

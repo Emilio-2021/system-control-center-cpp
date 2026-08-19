@@ -22,28 +22,28 @@ The Python project at `C:\Python\SystemControlCenter` remains independent and un
 - [x] Serve `/static/*` and HTML templates
 - [x] Add a health-check route
 - [x] Document build and run commands
-- [ ] Add request routing for login and application workflows
+- [x] Add request routing for login and application workflows
 
 ### 3. Persistence
 
-- Add SQLite access behind a small repository layer
-- Read products and users from `data/system_control_center.db`
-- Use prepared statements and explicit transactions
-- Keep database connection/session ownership scoped to requests
+- [x] Add SQLite access behind a small repository layer
+- [x] Read products and users from `data/system_control_center.db`
+- [x] Use prepared statements and explicit transactions
+- [x] Keep database connection/session ownership scoped to requests
 
 ### 4. Authentication and UI
 
-- Implement login and logout routes
-- Add signed sessions and password verification
-- Reconnect the copied login, dashboard, products, and users templates
-- Enforce administrator, operator, and viewer permissions
+- [x] Implement login and logout routes
+- [x] Add server-side sessions and password verification
+- [x] Reconnect the copied login, dashboard, products, and users templates
+- [x] Enforce administrator, operator, and viewer permissions
 
 ### 5. Business workflows
 
-- Products and inventory management
-- Customer/entity management
-- Checkout and order history
-- Full refunds with inventory restoration
+- [x] Products and inventory management
+- [x] Customer/entity management
+- [x] Checkout and order history
+- [x] Full refunds with inventory restoration
 
 ### 6. Concurrency and quality
 
@@ -51,6 +51,7 @@ The Python project at `C:\Python\SystemControlCenter` remains independent and un
 - Verify that inventory cannot be oversold
 - Test duplicate refund protection
 - Add error handling, structured logging, and input validation
+- [x] Add authenticated integration coverage for CRUD and invoice workflows
 - Add a recruiter-focused architecture and testing section to the README
 
 ## Fresh-shell starting point

@@ -6,7 +6,7 @@ The Python application remains separate at `C:\Python\SystemControlCenter` and i
 
 ## Current milestone
 
-The current version contains a native C++ web server, Inja-rendered HTML templates, SQLite persistence, bcrypt-compatible authentication, server-side sessions, role-based access control, and the main ERP workflows.
+The current version contains a native C++ web server, Inja-rendered HTML templates, SQLite persistence, bcrypt-compatible authentication, server-side sessions, role-based access control, and the main ERP workflows. The UI follows the Python reference with multi-line invoice checkout, invoice-style order details, sortable product catalog columns, modal CRUD forms, and consistent dashboard navigation.
 
 ## Build with CMake and MinGW
 
@@ -46,10 +46,10 @@ Available foundation routes:
 - `GET /` serves `templates/login.html`
 - `GET /health` returns a JSON health response
 - `POST /login` verifies credentials against `data/system_control_center.db`
-- `GET /products-view` renders the SQLite-backed product catalog
+- `GET /products-view` renders the SQLite-backed, sortable product catalog (`sort_by` and `order` query parameters)
 - `GET /entities-view` renders the SQLite-backed person/company registry
 - `GET /users-view` renders the administrator-only user and role registry
-- `GET /checkout` renders the checkout form for operators and administrators
+- `GET /checkout` renders the invoice checkout form for operators and administrators, with a read-only catalog view for viewers
 - `POST /checkout/create` creates a completed order and deducts stock transactionally
 - `GET /orders-view` renders order history
 - `GET /orders/{order_id}` renders order details
@@ -57,8 +57,10 @@ Available foundation routes:
 - `GET /static/*` serves Bootstrap assets
 - `GET /templates/*` serves the copied HTML templates
 
-## Remaining hardening and test work
+## Verification and remaining hardening
 
-- Add integration tests for authenticated routes and multi-line checkout
+- The test suite contains `inventory_tests`, `bcrypt_tests`, and `http_integration_tests`; all 3 pass.
+- Integration coverage includes authentication, protected routes, product/entity/user CRUD, sorting, checkout, and order detail rendering.
+- Runtime request support logging is written to `logs/log.txt` with automatic rotation through three backups.
 - Add concurrency tests proving inventory cannot be oversold
 - Improve user-facing error messages and deployment hardening

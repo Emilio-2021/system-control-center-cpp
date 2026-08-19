@@ -42,10 +42,11 @@ cmake --build build --config Release
 ctest --test-dir build --output-on-failure
 ```
 
-The current test result is 2/2 passing:
+The current test result is 3/3 passing:
 
 - `inventory_tests`
 - `bcrypt_tests`
+- `http_integration_tests` — isolated authenticated route and CRUD workflow coverage
 
 Start the application with:
 
@@ -84,6 +85,10 @@ Then browse to `http://127.0.0.1:8080`.
 - Checkout and refund operations use SQLite transactions.
 - Refund tables are expected in the database: `order_refunds` and `order_refund_items`.
 - The server binds to loopback (`127.0.0.1`) by default.
+- The server writes bounded request support logs to `logs/log.txt`, rotating at 5 MiB with up to three backups; query parameters are excluded from log entries.
+- Authenticated pages use a dashboard back link with a page-specific descriptor, matching the Python reference navigation style.
+- Checkout starts with no selected customer or product row; operators/admins add invoice lines interactively.
+- Dashboard recent-order links preserve their origin, so order details can return to either the dashboard or order history.
 
 ## Git state
 
@@ -97,13 +102,12 @@ b92f236 Create C++ system control center web app
 
 ## Recommended next steps
 
-1. Add authenticated integration tests for login, dashboard, checkout, order detail, and role restrictions.
-2. Add a safe test database or transaction rollback test for multi-line checkout and refunds.
-3. Add concurrency tests proving stock cannot be oversold.
-4. Improve user-facing error messages for failed product, entity, user, checkout, and refund operations.
-5. Reformat the dense checkout/order functions in `src/http_server.cpp`; the build currently succeeds but emits `-Wmisleading-indentation` warnings for some legacy one-line functions.
-6. Consider replacing in-memory sessions with a persistent or signed session strategy before production deployment.
-7. Review deployment hardening, including request size limits, cookie security, CSRF protection, and production logging.
+1. Add concurrency tests proving stock cannot be oversold.
+2. Add duplicate-refund and transaction rollback coverage for multi-line checkout/refunds.
+3. Improve user-facing error messages for failed product, entity, user, checkout, and refund operations.
+4. Reformat the dense checkout/order functions in `src/http_server.cpp`; the build currently succeeds but emits `-Wmisleading-indentation` warnings for some legacy one-line functions.
+5. Consider replacing in-memory sessions with a persistent or signed session strategy before production deployment.
+6. Review deployment hardening, including request size limits, cookie security, CSRF protection, and production logging.
 
 ## Files to review first tomorrow
 
@@ -113,4 +117,3 @@ b92f236 Create C++ system control center web app
 - `templates/checkout.html` — multi-line checkout UI.
 - `templates/order_detail.html` — refund form.
 - `CMakeLists.txt` — build targets and bundled dependencies.
-
