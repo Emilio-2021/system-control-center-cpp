@@ -13,8 +13,8 @@
 
 #include <cstdlib>
 #include <iostream>
-#include <sstream>
 #include <string>
+#include <utility>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -27,41 +27,11 @@
 
 namespace {
 
-std::string decorate_response(std::string_view status, std::string_view type,
-                              std::string_view body, std::string_view extra_headers = {}) {
-    std::string rendered_body(body);
-    const std::string plain_brand = R"(<a class="navbar-brand" href="/dashboard">System Control Center</a>)";
-    const std::string arrow_brand = R"(<a class="navbar-brand" href="/dashboard">← System Control Center</a>)";
-    std::string section_label = "System Control Center";
-    if (rendered_body.find("Product Master Catalog") != std::string::npos) section_label = "Stock Room Registry";
-    else if (rendered_body.find("Business Entities Registry") != std::string::npos) section_label = "Enterprise Business Entities Matrix";
-    else if (rendered_body.find("Users and Roles") != std::string::npos) section_label = "User Records Management Grid";
-    else if (rendered_body.find("Orders &amp; Invoiced Line Items") != std::string::npos) section_label = "Transaction Tracking Room";
-    else if (rendered_body.find("Invoice Checkout Wizard") != std::string::npos || rendered_body.find("Create New Sales Order Invoice") != std::string::npos) section_label = "Sales Register Desk";
-    else if (rendered_body.find("Order #") != std::string::npos) section_label = "Order Details";
-    const std::string dashboard_brand = "<div class=\"d-flex align-items-center\"><a class=\"navbar-brand\" href=\"/dashboard\">← System Dashboard</a><span class=\"navbar-text text-white-50 ms-3\">" + section_label + "</span></div>";
-    for (const auto& brand : {plain_brand, arrow_brand}) {
-        std::size_t position = 0;
-        while ((position = rendered_body.find(brand, position)) != std::string::npos) {
-            rendered_body.replace(position, brand.size(), dashboard_brand);
-            position += dashboard_brand.size();
-        }
-    }
-    std::ostringstream output;
-    output << "HTTP/1.1 " << status << "\r\n"
-           << "Content-Type: " << type << "\r\n"
-           << extra_headers
-           << "Content-Length: " << rendered_body.size() << "\r\n"
-           << "Connection: close\r\n\r\n";
-    output.write(rendered_body.data(), static_cast<std::streamsize>(rendered_body.size()));
-    return output.str();
-}
-
 std::string handle_request(std::string_view request, const std::filesystem::path& root) {
     const auto path = request_path(request);
-    if (path.empty()) return decorate_response("400 Bad Request", "text/plain; charset=utf-8", "Bad request\n");
+    if (path.empty()) return response("400 Bad Request", "text/plain; charset=utf-8", "Bad request\n");
     const auto method = request_method(request);
-    if (path == "/health") return decorate_response("200 OK", "application/json; charset=utf-8", "{\"status\":\"ok\"}\n");
+    if (path == "/health") return response("200 OK", "application/json; charset=utf-8", "{\"status\":\"ok\"}\n");
     if (method == "POST" && path == "/login") {
         const auto body_start = request.find("\r\n\r\n");
         return auth_login_result(root, body_start == std::string_view::npos ? std::string_view{} : request.substr(body_start + 4));
@@ -81,15 +51,15 @@ std::string handle_request(std::string_view request, const std::filesystem::path
     if (method == "GET" && path == "/dashboard") return dashboard_route(root, request);
     if (method == "GET" && path == "/logout") {
         erase_session(request);
-        return decorate_response("303 See Other", "text/plain; charset=utf-8", "", "Location: /\r\nSet-Cookie: scc_session=; Max-Age=0; HttpOnly; SameSite=Lax\r\n");
+        return response("303 See Other", "text/plain; charset=utf-8", "", "Location: /\r\nSet-Cookie: scc_session=; Max-Age=0; HttpOnly; SameSite=Lax\r\n");
     }
-    if (path.find("..") != std::string::npos) return decorate_response("403 Forbidden", "text/plain; charset=utf-8", "Forbidden\n");
+    if (path.find("..") != std::string::npos) return response("403 Forbidden", "text/plain; charset=utf-8", "Forbidden\n");
     const std::string relative = path == "/" ? "/templates/login.html" : std::string(path);
-    if (relative.rfind("/static/", 0) != 0 && relative.rfind("/templates/", 0) != 0) return decorate_response("404 Not Found", "text/plain; charset=utf-8", "Not found\n");
+    if (relative.rfind("/static/", 0) != 0 && relative.rfind("/templates/", 0) != 0) return response("404 Not Found", "text/plain; charset=utf-8", "Not found\n");
     const auto file_path = root / relative.substr(1);
     const auto body = read_file(file_path);
-    if (body.empty()) return decorate_response("404 Not Found", "text/plain; charset=utf-8", "Not found\n");
-    return decorate_response("200 OK", content_type(file_path), body);
+    if (body.empty()) return response("404 Not Found", "text/plain; charset=utf-8", "Not found\n");
+    return response("200 OK", content_type(file_path), body);
 }
 
 }
