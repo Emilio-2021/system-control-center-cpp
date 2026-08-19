@@ -134,6 +134,7 @@ int main() {
         "GET", "/orders/" + std::to_string(order_id), {}, session_cookie));
     assert(order_detail.find("Order Summary") != std::string::npos);
     assert(order_detail.find("Invoice Line Items") != std::string::npos);
+    assert(order_detail.find("Order Details") != std::string::npos);
     const auto dashboard_order_detail = server.handle_request(request(
         "GET", "/orders/" + std::to_string(order_id) + "?back=dashboard", {}, session_cookie));
     assert(dashboard_order_detail.find("← System Dashboard") != std::string::npos);
