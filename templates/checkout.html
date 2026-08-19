@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Checkout</title><link href="/static/bootstrap.min.css" rel="stylesheet"></head>
+<body class="bg-light"><nav class="navbar navbar-dark bg-dark px-3"><a class="navbar-brand" href="/dashboard">System Control Center</a><a href="/logout" class="btn btn-sm btn-danger">Logout</a></nav>
+<main class="container py-5"><h1>New order</h1>
+<form action="/checkout/create" method="POST" class="card card-body shadow-sm">
+<label class="form-label">Customer</label>
+<select class="form-select mb-4" name="entity_id" required>{% for c in customers %}<option value="{{ c.id }}">{{ c.name }} ({{ c.entity_type }})</option>{% endfor %}</select>
+<div id="lines"><div class="row g-2 mb-2 order-line"><div class="col-md-8"><select class="form-select" name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} — ${{ p.price }} ({{ p.stock_quantity }} available)</option>{% endfor %}</select></div><div class="col-md-3"><input class="form-control" name="quantity" type="number" min="1" value="1" required></div><div class="col-md-1"><button class="btn btn-outline-danger remove-line" type="button">×</button></div></div></div>
+<div class="d-flex gap-2 mt-3"><button class="btn btn-outline-primary" id="add-line" type="button">Add product</button><button class="btn btn-success" type="submit">Post and finalize order</button></div>
+</form></main>
+<script>
+const lines = document.getElementById('lines');
+document.getElementById('add-line').addEventListener('click', () => {
+  const first = lines.querySelector('.order-line');
+  const copy = first.cloneNode(true);
+  copy.querySelector('select').selectedIndex = 0;
+  copy.querySelector('input').value = 1;
+  lines.appendChild(copy);
+});
+lines.addEventListener('click', event => { if (event.target.classList.contains('remove-line') && lines.children.length > 1) event.target.closest('.order-line').remove(); });
+</script></body></html>
