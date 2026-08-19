@@ -15,6 +15,20 @@
 | Data format | Form requests today; versioned JSON/XML REST API planned |
 | Testing | Unit tests, authentication tests, CRUD tests, checkout and order integration tests |
 
+## Application screenshots
+
+The screenshots below show the current browser UI and workflow coverage.
+
+| View | Screenshot |
+| --- | --- |
+| Login | [![Login](res/login.PNG)](res/login.PNG) |
+| Dashboard | [![Dashboard](res/dashboard.png)](res/dashboard.png) |
+| Product Master Catalog | [![Product Master Catalog](res/ProductMasterCatalog.png)](res/ProductMasterCatalog.png) |
+| Business Entities Registry | [![Business Entities Registry](res/BusinessEntitiesRegistry.png)](res/BusinessEntitiesRegistry.png) |
+| Create New Sales Order | [![Create New Sales Order](res/CreateNewSalesOrderInvoice.png)](res/CreateNewSalesOrderInvoice.png) |
+| Orders | [![Orders](res/OrdersView.png)](res/OrdersView.png) |
+| Orders and Invoiced Line Items | [![Orders and Invoiced Line Items](res/OrdersInvoicedLineItems.png)](res/OrdersInvoicedLineItems.png) |
+
 ## What this project demonstrates
 
 - Native C++ HTTP and socket programming.
