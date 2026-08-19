@@ -9,6 +9,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(system_control_center
     src/main.cpp
     src/http_server.cpp
+    src/auth_routes.cpp
+    src/dashboard_routes.cpp
+    src/product_routes.cpp
+    src/admin_routes.cpp
+    src/order_routes.cpp
+    src/http_request.cpp
+    src/http_response.cpp
+    src/http_transport.cpp
+    src/static_assets.cpp
+    src/session_store.cpp
+    src/app_logger.cpp
     src/inventory.cpp
     third_party/sqlite/sqlite3.c
     third_party/bcrypt/bcrypt.cpp
@@ -61,6 +72,17 @@ add_test(NAME bcrypt_tests COMMAND bcrypt_tests)
 add_executable(http_integration_tests
     tests/http_integration_tests.cpp
     src/http_server.cpp
+    src/auth_routes.cpp
+    src/dashboard_routes.cpp
+    src/product_routes.cpp
+    src/admin_routes.cpp
+    src/order_routes.cpp
+    src/http_request.cpp
+    src/http_response.cpp
+    src/http_transport.cpp
+    src/static_assets.cpp
+    src/session_store.cpp
+    src/app_logger.cpp
     third_party/sqlite/sqlite3.c
     third_party/bcrypt/bcrypt.cpp
     third_party/bcrypt/blowfish.cpp
